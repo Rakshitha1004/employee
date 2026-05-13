@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: employee-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: employee_db
+      MYSQL_USER: employee
+      MYSQL_PASSWORD: employee123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 5
+      interval: 10s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: employee-backend
+    ports:
+      - "4000:4000"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/employee_db?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: employee
+      SPRING_DATASOURCE_PASSWORD: employee123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+      SPRING_PROFILES_ACTIVE: dev
+      APP_FRONTEND_ORIGIN: http://localhost:5173
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      timeout: 5s
+      retries: 5
+      interval: 10s
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    container_name: employee-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:4000
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
